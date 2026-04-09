@@ -1,0 +1,70 @@
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
+import numpy as np
+
+# 1. GERÇEK VERİ SETİNİ YÜKLEME
+print("Veri seti indiriliyor...")
+dataset = load_dataset("gretelai/symptom_to_diagnosis")
+
+# Veri setindeki 22 eşsiz hastalığı (label) bulup yapay zekanın anlayacağı sayılara çeviriyoruz
+unique_labels = dataset['train'].unique('output_text')
+label2id = {label: i for i, label in enumerate(unique_labels)}
+id2label = {i: label for i, label in enumerate(unique_labels)}
+
+def encode_labels(example):
+    example['label'] = label2id[example['output_text']]
+    return example
+
+# Sayısal etiketleri veri setimize uyguluyoruz
+dataset = dataset.map(encode_labels)
+
+# 2. TOKENIZER AŞAMASI (Metinleri sayılara bölme)
+model_adi = "distilbert-base-uncased"
+tokenizer = AutoTokenizer.from_pretrained(model_adi)
+
+# 'input_text' sütunu hastaların gerçek şikayetlerini içeriyor
+def tokenize_fonksiyonu(ornekler):
+    return tokenizer(ornekler["input_text"], padding="max_length", truncation=True, max_length=128)
+
+tokenized_datasets = dataset.map(tokenize_fonksiyonu, batched=True)
+
+# 3. MODELİ YÜKLEME
+num_labels = len(unique_labels)
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_adi, 
+    num_labels=num_labels,
+    id2label=id2label, 
+    label2id=label2id
+)
+
+# 4. EĞİTİM AYARLARI VE BAŞLATMA
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+    accuracy = (predictions == labels).mean()
+    return {"accuracy": accuracy}
+
+training_args = TrainingArguments(
+    output_dir="./gercek_saglik_modeli",
+    learning_rate=2e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=3, # Veri seti büyük olduğu için 3 tur yeterli ve hızlı olacaktır
+    weight_decay=0.01,
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True,
+    report_to="none"
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["test"],
+    compute_metrics=compute_metrics,
+)
+
+print("Gerçek sağlık verisiyle eğitim başlıyor... Bu işlem veri setinin büyüklüğüne göre 3-4 dakika sürebilir.")
+trainer.train()
+print("Eğitim başarıyla tamamlandı!")
