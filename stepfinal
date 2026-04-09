@@ -1,0 +1,37 @@
+import gradio as gr
+import torch
+
+# 1. Tahmin Fonksiyonu (Sadece teşhisi döndürür)
+def predict_diagnosis(patient_symptom):
+    if not patient_symptom.strip():
+        return "Please enter valid symptoms."
+        
+    inputs = tokenizer(patient_symptom, return_tensors="pt").to(model.device)
+    
+    with torch.no_grad():
+        outputs = model(**inputs)
+        
+    # En yüksek ihtimalli sonucu alıyoruz
+    predicted_id = outputs.logits.argmax().item()
+    diagnosis = id2label[predicted_id]
+    
+    # Sadece net teşhisi yazdırıyoruz
+    return f"AI Diagnosis: {diagnosis.upper()}"
+
+# 2. Minimalist Arayüz Tasarımı
+arayuz = gr.Interface(
+    fn=predict_diagnosis, 
+    inputs=gr.Textbox(
+        lines=3, 
+        placeholder="Type patient symptoms here...", 
+        label="Symptoms"
+    ),
+    outputs=gr.Textbox(label="Diagnosis Result"),
+    title="🤖 AI Clinical Assistant",
+    allow_flagging="never", 
+    css="footer {visibility: hidden; display: none !important;}" 
+)
+
+# 3. Uygulamayı yayına alma
+print("Arayüz hazırlanıyor... Lütfen linke tıklayın.")
+arayuz.launch(share=True)
