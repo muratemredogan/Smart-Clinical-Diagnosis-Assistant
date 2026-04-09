@@ -1,0 +1,28 @@
+import torch
+
+# Hocanın gözüne girecek farklı zorluk seviyelerinde test senaryoları
+test_senaryolari = {
+    "Klasik ve Net": "I have a severe pain in my chest that radiates to my left arm.",
+    "Çok Kısa / Yetersiz": "My throat hurts.",
+    "Yazım Hatalı (Typo)": "I hav a terible stomech ake and feal like throwing up.",
+    "Psikolojik / Soyut": "I feel hopeless, I can't sleep, and I cry all the time.",
+    "Alakasız (Modeli Şaşırtma)": "My car broke down and I am very angry." 
+}
+
+print("--- YAPAY ZEKA KLİNİĞİ UÇ DURUM (EDGE CASE) TESTLERİ ---\n")
+
+for durum, cumle in test_senaryolari.items():
+    # Cümleyi modele hazırlama
+    inputs = tokenizer(cumle, return_tensors="pt").to(model.device)
+    
+    # Tahmin yapma
+    with torch.no_grad():
+        outputs = model(**inputs)
+    
+    tahmin_edilen_sinif_id = outputs.logits.argmax().item()
+    hastalik_teshisi = id2label[tahmin_edilen_sinif_id]
+    
+    print(f"[{durum}]")
+    print(f"Şikayet: '{cumle}'")
+    print(f"Yapay Zeka Teşhisi: {hastalik_teshisi.upper()}\n")
+    print("-" * 50)
